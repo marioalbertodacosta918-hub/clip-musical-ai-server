@@ -8,6 +8,7 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") {
     return res.status(405).json({
+      sucesso: false,
       error: "Método não permitido"
     });
   }
@@ -19,8 +20,9 @@ export default async function handler(req, res) {
       formato = "16:9"
     } = req.body || {};
 
-    if (!roteiro) {
+    if (!roteiro || roteiro.trim() === "") {
       return res.status(400).json({
+        sucesso: false,
         error: "O roteiro não foi informado."
       });
     }
@@ -36,20 +38,27 @@ export default async function handler(req, res) {
     }
 
     const prompt = `
-Crie uma cena cinematográfica para um clipe musical cristão.
+Crie um vídeo cinematográfico para um clipe musical cristão.
 
-Roteiro:
+ROTEIRO:
 ${roteiro}
 
-Estilo visual:
-cinematográfico, emocionante, realista, iluminação dramática,
-movimentos de câmera suaves, composição profissional,
-atmosfera bíblica e épica.
+ESTILO:
+Cinematográfico, emocionante, realista, épico,
+iluminação dramática, movimentos de câmera suaves,
+composição profissional, atmosfera bíblica.
 
-Não adicionar textos, legendas ou marcas d'água.
+IMPORTANTE:
+Não adicionar textos na imagem.
+Não adicionar legendas.
+Não adicionar marcas d'água.
 `;
 
-    const task = await client.imageToVideo
+    /*
+     * Geração de vídeo a partir de texto.
+     */
+
+    const task = await client.textToVideo
       .create({
         model: "gen4.5",
         promptText: prompt,
@@ -57,6 +66,13 @@ Não adicionar textos, legendas ou marcas d'água.
         duration: 5
       })
       .waitForTaskOutput();
+
+    if (!task.output || !task.output[0]) {
+      return res.status(500).json({
+        sucesso: false,
+        error: "O Runway não retornou o vídeo."
+      });
+    }
 
     return res.status(200).json({
       sucesso: true,
@@ -68,11 +84,13 @@ Não adicionar textos, legendas ou marcas d'água.
     console.error("Erro Runway:", error);
 
     if (error instanceof TaskFailedError) {
+
       return res.status(500).json({
         sucesso: false,
         error: "O Runway não conseguiu gerar o vídeo.",
         detalhes: error.taskDetails
       });
+
     }
 
     return res.status(500).json({
