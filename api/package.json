@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@runwayml/sdk": "latest"
+"@runwayml/sdk": "4.14.0"
   }
 }
