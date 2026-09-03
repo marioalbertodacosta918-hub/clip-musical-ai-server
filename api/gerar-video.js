@@ -112,10 +112,10 @@ export default async function handler(req, res) {
     let ratio;
 
     if (formato === "9:16") {
-      ratio = "768:1280";
-    } else {
-      ratio = "1280:768";
-    }
+  ratio = "720:1280";
+} else {
+  ratio = "1280:720";
+}
 
     // ==============================
     // PROMPT
