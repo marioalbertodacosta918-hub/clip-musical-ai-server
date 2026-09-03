@@ -245,4 +245,3 @@ Criar movimento cinematográfico natural a partir da imagem.
     });
   }
 }
-  
