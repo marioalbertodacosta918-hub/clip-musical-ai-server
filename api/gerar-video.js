@@ -6,6 +6,10 @@ const client = new RunwayML({
 
 export default async function handler(req, res) {
 
+  // ==============================
+  // CORS
+  // ==============================
+
   res.setHeader(
     "Access-Control-Allow-Origin",
     "https://marioalbertodacosta918-hub.github.io"
@@ -21,9 +25,17 @@ export default async function handler(req, res) {
     "Content-Type"
   );
 
+  // ==============================
+  // OPTIONS
+  // ==============================
+
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
+
+  // ==============================
+  // SOMENTE POST
+  // ==============================
 
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -34,9 +46,27 @@ export default async function handler(req, res) {
 
   try {
 
+    // ==============================
+    // VERIFICAR API KEY
+    // ==============================
+
+    if (!process.env.RUNWAYML_API_SECRET) {
+      return res.status(500).json({
+        sucesso: false,
+        error: "RUNWAYML_API_SECRET não está configurada na Vercel."
+      });
+    }
+
+    // ==============================
+    // RECEBER DADOS
+    // ==============================
+
     const body = req.body || {};
 
-    console.log("BODY RECEBIDO:", body);
+    console.log("=================================");
+    console.log("BODY RECEBIDO:");
+    console.log(body);
+    console.log("=================================");
 
     const roteiro =
       typeof body.roteiro === "string"
@@ -48,6 +78,15 @@ export default async function handler(req, res) {
         ? body.formato
         : "16:9";
 
+    const imagem =
+      typeof body.imagem === "string"
+        ? body.imagem.trim()
+        : "";
+
+    // ==============================
+    // VALIDAR ROTEIRO
+    // ==============================
+
     if (!roteiro) {
       return res.status(400).json({
         sucesso: false,
@@ -55,59 +94,104 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!process.env.RUNWAYML_API_SECRET) {
-      return res.status(500).json({
+    // ==============================
+    // VALIDAR IMAGEM
+    // ==============================
+
+    if (!imagem) {
+      return res.status(400).json({
         sucesso: false,
-        error: "RUNWAYML_API_SECRET não está configurada na Vercel."
+        error: "Nenhuma imagem foi enviada para gerar a cena."
       });
     }
+
+    // ==============================
+    // DEFINIR FORMATO
+    // ==============================
 
     let ratio;
 
     if (formato === "9:16") {
-      ratio = "720:1280";
+      ratio = "768:1280";
     } else {
-      ratio = "1280:720";
+      ratio = "1280:768";
     }
 
-    const promptText = `
-Crie um vídeo cinematográfico para um clipe musical cristão.
+    // ==============================
+    // PROMPT
+    // ==============================
 
-ROTEIRO:
+    const promptText = `
+Crie uma cena cinematográfica para um clipe musical cristão.
+
+Use a imagem fornecida como imagem inicial da cena.
+
+ROTEIRO DA CENA:
 ${roteiro}
 
 DIREÇÃO VISUAL:
-Cinematográfico, realista, emocionante e épico.
+
+Cinematográfico.
+Realista.
+Emocionante.
+Épico.
 Iluminação dramática.
 Movimentos de câmera suaves e profissionais.
 Atmosfera de fé, esperança e superação.
 Cenários naturais e grandiosos.
 Fotografia cinematográfica.
+Profundidade de campo cinematográfica.
+Movimento natural dos personagens e elementos da cena.
 
 IMPORTANTE:
+
 Não adicionar textos.
 Não adicionar legendas.
 Não adicionar letras de música.
+Não adicionar logotipos.
 Não adicionar marcas d'água.
+Não modificar desnecessariamente os personagens presentes na imagem.
+Preservar a identidade visual da imagem original.
+Criar movimento cinematográfico natural a partir da imagem.
 `;
 
-    console.log("ENVIANDO PARA RUNWAY:");
+    console.log("=================================");
+    console.log("ENVIANDO PARA RUNWAY");
     console.log("Modelo: gen4.5");
     console.log("Ratio:", ratio);
     console.log("Duração: 5 segundos");
+    console.log("Imagem recebida: SIM");
+    console.log("=================================");
+
+    // ==============================
+    // GERAR VÍDEO
+    // ==============================
 
     const task = await client.imageToVideo.create({
       model: "gen4.5",
+      promptImage: imagem,
       promptText: promptText,
       ratio: ratio,
       duration: 5
     });
 
-    console.log("TAREFA CRIADA:", task);
+    console.log("TAREFA RUNWAY CRIADA:");
+    console.log(task);
+
+    // ==============================
+    // AGUARDAR RESULTADO
+    // ==============================
 
     const resultado = await task.waitForTaskOutput();
 
-    console.log("RESULTADO RUNWAY:", resultado);
+    console.log("=================================");
+    console.log("RESULTADO RUNWAY:");
+    console.log(resultado);
+    console.log("=================================");
+
+    // ==============================
+    // VALIDAR RESULTADO
+    // ==============================
 
     if (
       !resultado ||
@@ -122,6 +206,10 @@ Não adicionar marcas d'água.
       });
     }
 
+    // ==============================
+    // SUCESSO
+    // ==============================
+
     return res.status(200).json({
       sucesso: true,
       videoUrl: resultado.output[0]
@@ -129,15 +217,27 @@ Não adicionar marcas d'água.
 
   } catch (error) {
 
-    console.error("ERRO COMPLETO RUNWAY:", error);
+    console.error("=================================");
+    console.error("ERRO COMPLETO RUNWAY:");
+    console.error(error);
+    console.error("=================================");
+
+    // ==============================
+    // ERRO DA TAREFA RUNWAY
+    // ==============================
 
     if (error instanceof TaskFailedError) {
+
       return res.status(500).json({
         sucesso: false,
         error: "A geração do vídeo falhou na Runway.",
         detalhes: error.taskDetails || null
       });
     }
+
+    // ==============================
+    // ERRO GERAL
+    // ==============================
 
     return res.status(500).json({
       sucesso: false,
