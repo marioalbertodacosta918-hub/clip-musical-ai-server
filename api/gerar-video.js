@@ -22,12 +22,12 @@ export default async function handler(req, res) {
     "Content-Type"
   );
 
-  // Responde ao preflight do navegador
+  // Preflight
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
 
-  // Somente POST pode gerar vídeo
+  // Somente POST
   if (req.method !== "POST") {
     return res.status(405).json({
       sucesso: false,
@@ -42,7 +42,11 @@ export default async function handler(req, res) {
       formato = "16:9"
     } = req.body || {};
 
-    if (!roteiro || typeof roteiro !== "string" || roteiro.trim() === "") {
+    if (
+      !roteiro ||
+      typeof roteiro !== "string" ||
+      roteiro.trim() === ""
+    ) {
       return res.status(400).json({
         sucesso: false,
         error: "O roteiro não foi informado."
@@ -55,11 +59,8 @@ export default async function handler(req, res) {
       ratio = "720:1280";
     }
 
-    /*
-     * O formato 1:1 não é enviado ao Gen-4.5.
-     * Caso seja solicitado, usamos 16:9.
-     */
-
+    // Gen-4.5 não aceita 1:1 em texto para vídeo.
+    // Nesse caso usamos 16:9.
     if (formato === "1:1") {
       ratio = "1280:720";
     }
@@ -86,8 +87,11 @@ Não adicionar marcas d'água.
     console.log("Ratio:", ratio);
 
     /*
-     * Gen-4.5
-     * Texto para vídeo sem imagem.
+     * GEN-4.5
+     * Texto para vídeo.
+     *
+     * IMPORTANTE:
+     * Não enviar promptImage.
      */
 
     const task = await client.imageToVideo
