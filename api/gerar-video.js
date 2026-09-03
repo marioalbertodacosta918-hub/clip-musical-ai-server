@@ -112,48 +112,81 @@ export default async function handler(req, res) {
     let ratio;
 
     if (formato === "9:16") {
-  ratio = "720:1280";
-} else {
-  ratio = "1280:720";
-}
+      ratio = "720:1280";
+    } else {
+      ratio = "1280:720";
+    }
 
     // ==============================
-    // PROMPT
+    // LIMPAR E LIMITAR ROTEIRO
     // ==============================
 
-    const promptText = `
-Crie uma cena cinematográfica para um clipe musical cristão.
+    /*
+      A Runway aceita no máximo 1000 caracteres
+      no campo promptText.
 
-Use a imagem fornecida como imagem inicial da cena.
+      Reservamos espaço para a direção visual
+      e usamos apenas a parte relevante do roteiro.
+    */
 
-ROTEIRO DA CENA:
-${roteiro}
+    const roteiroLimpo = roteiro
+      .replace(/\s+/g, " ")
+      .trim();
 
-DIREÇÃO VISUAL:
+    // ==============================
+    // DIREÇÃO VISUAL CURTA
+    // ==============================
 
-Cinematográfico.
-Realista.
-Emocionante.
-Épico.
+    const direcaoVisual = `
+Cena cinematográfica para clipe musical cristão.
+Realista, emocionante e épica.
 Iluminação dramática.
-Movimentos de câmera suaves e profissionais.
+Movimento de câmera suave e profissional.
 Atmosfera de fé, esperança e superação.
-Cenários naturais e grandiosos.
-Fotografia cinematográfica.
-Profundidade de campo cinematográfica.
-Movimento natural dos personagens e elementos da cena.
-
-IMPORTANTE:
-
-Não adicionar textos.
-Não adicionar legendas.
-Não adicionar letras de música.
-Não adicionar logotipos.
-Não adicionar marcas d'água.
-Não modificar desnecessariamente os personagens presentes na imagem.
+Movimento natural dos personagens e elementos.
 Preservar a identidade visual da imagem original.
-Criar movimento cinematográfico natural a partir da imagem.
+Não adicionar textos, legendas, letras, logotipos ou marcas d'água.
 `;
+
+    // ==============================
+    // LIMITE DO PROMPT
+    // ==============================
+
+    const limitePrompt = 1000;
+
+    /*
+      Criamos primeiro a parte fixa.
+    */
+
+    const textoBase =
+      "Crie uma cena cinematográfica usando a imagem fornecida como imagem inicial.\n\n" +
+      direcaoVisual +
+      "\nDescrição da cena:\n";
+
+    /*
+      Calculamos quanto espaço sobra para o roteiro.
+    */
+
+    const espacoDisponivel =
+      limitePrompt - textoBase.length;
+
+    let roteiroParaCena = roteiroLimpo;
+
+    if (roteiroParaCena.length > espacoDisponivel) {
+      roteiroParaCena =
+        roteiroParaCena.substring(0, espacoDisponivel - 3).trim() + "...";
+    }
+
+    const promptText =
+      textoBase +
+      roteiroParaCena;
+
+    // ==============================
+    // GARANTIA ABSOLUTA
+    // ==============================
+
+    const promptFinal =
+      promptText.substring(0, 1000);
 
     console.log("=================================");
     console.log("ENVIANDO PARA RUNWAY");
@@ -161,6 +194,7 @@ Criar movimento cinematográfico natural a partir da imagem.
     console.log("Ratio:", ratio);
     console.log("Duração: 5 segundos");
     console.log("Imagem recebida: SIM");
+    console.log("Tamanho do prompt:", promptFinal.length);
     console.log("=================================");
 
     // ==============================
@@ -170,7 +204,7 @@ Criar movimento cinematográfico natural a partir da imagem.
     const task = await client.imageToVideo.create({
       model: "gen4.5",
       promptImage: imagem,
-      promptText: promptText,
+      promptText: promptFinal,
       ratio: ratio,
       duration: 5
     });
