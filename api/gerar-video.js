@@ -6,7 +6,6 @@ const client = new RunwayML({
 
 export default async function handler(req, res) {
 
-  // CORS
   res.setHeader(
     "Access-Control-Allow-Origin",
     "https://marioalbertodacosta918-hub.github.io"
@@ -22,12 +21,10 @@ export default async function handler(req, res) {
     "Content-Type"
   );
 
-  // Preflight
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
 
-  // Somente POST
   if (req.method !== "POST") {
     return res.status(405).json({
       sucesso: false,
@@ -37,103 +34,115 @@ export default async function handler(req, res) {
 
   try {
 
-    const {
-      roteiro,
-      formato = "16:9"
-    } = req.body || {};
+    const body = req.body || {};
 
-    if (
-      !roteiro ||
-      typeof roteiro !== "string" ||
-      roteiro.trim() === ""
-    ) {
+    console.log("BODY RECEBIDO:", body);
+
+    const roteiro =
+      typeof body.roteiro === "string"
+        ? body.roteiro.trim()
+        : "";
+
+    const formato =
+      typeof body.formato === "string"
+        ? body.formato
+        : "16:9";
+
+    if (!roteiro) {
       return res.status(400).json({
         sucesso: false,
         error: "O roteiro não foi informado."
       });
     }
 
-    let ratio = "1280:720";
+    if (!process.env.RUNWAYML_API_SECRET) {
+      return res.status(500).json({
+        sucesso: false,
+        error: "RUNWAYML_API_SECRET não está configurada na Vercel."
+      });
+    }
+
+    let ratio;
 
     if (formato === "9:16") {
       ratio = "720:1280";
-    }
-
-    // Gen-4.5 não aceita 1:1 em texto para vídeo.
-    // Nesse caso usamos 16:9.
-    if (formato === "1:1") {
+    } else {
       ratio = "1280:720";
     }
 
-    const prompt = `
+    const promptText = `
 Crie um vídeo cinematográfico para um clipe musical cristão.
 
 ROTEIRO:
 ${roteiro}
 
-ESTILO:
-Cinematográfico, emocionante, realista, épico,
-iluminação dramática, movimentos de câmera suaves,
-composição profissional e atmosfera bíblica.
+DIREÇÃO VISUAL:
+Cinematográfico, realista, emocionante e épico.
+Iluminação dramática.
+Movimentos de câmera suaves e profissionais.
+Atmosfera de fé, esperança e superação.
+Cenários naturais e grandiosos.
+Fotografia cinematográfica.
 
 IMPORTANTE:
-Não adicionar textos na imagem.
+Não adicionar textos.
 Não adicionar legendas.
+Não adicionar letras de música.
 Não adicionar marcas d'água.
 `;
 
-    console.log("Iniciando geração do vídeo...");
-    console.log("Formato:", formato);
+    console.log("ENVIANDO PARA RUNWAY:");
+    console.log("Modelo: gen4.5");
     console.log("Ratio:", ratio);
+    console.log("Duração: 5 segundos");
 
-    /*
-     * GEN-4.5
-     * Texto para vídeo.
-     *
-     * IMPORTANTE:
-     * Não enviar promptImage.
-     */
+    const task = await client.imageToVideo.create({
+      model: "gen4.5",
+      promptText: promptText,
+      ratio: ratio,
+      duration: 5
+    });
 
-    const task = await client.imageToVideo
-      .create({
-        model: "gen4.5",
-        promptText: prompt,
-        ratio: ratio,
-        duration: 5
-      })
-      .waitForTaskOutput();
+    console.log("TAREFA CRIADA:", task);
 
-    console.log("Resposta do Runway:", task);
+    const resultado = await task.waitForTaskOutput();
 
-    if (!task.output || !task.output[0]) {
+    console.log("RESULTADO RUNWAY:", resultado);
+
+    if (
+      !resultado ||
+      !resultado.output ||
+      !Array.isArray(resultado.output) ||
+      !resultado.output[0]
+    ) {
       return res.status(500).json({
         sucesso: false,
-        error: "O Runway não retornou o vídeo."
+        error: "O Runway terminou a tarefa, mas não retornou o vídeo.",
+        detalhes: resultado || null
       });
     }
 
     return res.status(200).json({
       sucesso: true,
-      videoUrl: task.output[0]
+      videoUrl: resultado.output[0]
     });
 
   } catch (error) {
 
-    console.error("Erro Runway:", error);
+    console.error("ERRO COMPLETO RUNWAY:", error);
 
     if (error instanceof TaskFailedError) {
-
       return res.status(500).json({
         sucesso: false,
-        error: "O Runway não conseguiu gerar o vídeo.",
+        error: "A geração do vídeo falhou na Runway.",
         detalhes: error.taskDetails || null
       });
-
     }
 
     return res.status(500).json({
       sucesso: false,
-      error: error.message || "Erro interno ao gerar o vídeo."
+      error: error?.message || "Erro interno ao gerar o vídeo."
     });
   }
 }
+  
